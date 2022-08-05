@@ -1,0 +1,23 @@
+#+begin_src akforth 
+: square dup * ;
+: .square dup . dup square . cr ;
+: squares begin .square -1 + dup while drop ;
+10 squares
+see square
+#+end_src
+
+#+RESULTS:
+#+begin_example
+10 100 
+9 81 
+8 64 
+7 49 
+6 36 
+5 25 
+4 16 
+3 9 
+2 4 
+1 1 
+00007ff7f46a34e8 dup
+00007ff7f46a34f0 *
+#+end_example
