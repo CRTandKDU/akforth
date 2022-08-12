@@ -1,6 +1,14 @@
 	;; ----------------------------------------------------
 	defcode 'FIND',4,0,FIND
-	ld	(SAVEBC), bc
+	ld	a,(STATE)
+	cp	1		; In compile mode?
+	jr	NZ, ffind	; No: search word/number
+	ld	hl, SKIP	; Yes: As if we parsed SKIP
+	push	hl
+	jp	(iy)
+ffind	exx
+	ld	hl, WORDFLG
+	ld	(hl), 0x0
 	ld	hl, LATEST
 flast	ld	e, (hl)
 	inc	hl
@@ -20,7 +28,9 @@ ftest	ld	de, WORDBUF	; Compare length (Pascal)
 	inc	hl
 	ld	a, (de)
 	ld	b, a
-	cp	(hl)
+	ld	a, (hl)
+	and	a, f_msk
+	cp	b
 	jr	NZ, fnext	; Check next word
 fmatch	inc	de
 	inc	hl
@@ -32,10 +42,13 @@ found	jr	fdone		; Leave hl on stack
 fnext	pop	hl
 	jr	flast
 notfd	pop	hl
-	ld	l, 0
-	ld	h, 0
+	ld	hl, WORDBUF+1	; P+C convention
+	call	1e5aH		; Convert to hex in DE
+	ld	hl, WORDFLG
+	ld	(hl), f_lit
+	ex	de, hl
 	push	hl
-fdone	ld	bc, (SAVEBC)	
+fdone	exx
 	jp	(iy)
 	;; ----------------------------------------------------
 	defcode 'INLINE',6,0,INLINE

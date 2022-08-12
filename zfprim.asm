@@ -1,4 +1,5 @@
-	defcode 'DICT',4,0,DICT
+	defcode 'SKIP',4,0,SKIP
+	pop	hl
 	jp	(iy)
 	;; ----------------------------------------------------
 	defcode '.',1,0,DOT
@@ -65,28 +66,17 @@ _loopb:
 	jp	(iy)
 	;; ----------------------------------------------------
 	defcode 'WB*',3,0,WBMUL
-	ld	(SAVEBC), bc	;  multiplies de by a and places the result in ahl
+	ld	(SAVEBC), bc	;  multiplies de by a into hl
 	pop	de
 	pop	hl
 	ld	a,l
-	ld	c, 0
-	ld	h, c
-	ld	l, h
-	add	a, a		; optimised 1st iteration
-	jr	nc, $+4
-	ld	h,d
-	ld	l,e
-	ld 	b, 7
-_loopw:
-	add	hl, hl
-	rla
-	jr	nc, $+4
+	ld	l, 0
+	ld	b, 8
+_loopw	add	hl, hl
+	add	a, a
+	jr	NC, _lpw0
 	add	hl, de
-	adc	a, c            ; yes this is actually adc a, 0 but since c is free we set it to zero and so we can save 1 byte and up to 3 T-states per iteration
-	djnz	_loopw
-	push	hl
-	ld	l,a
-	ld	h,0x0
+_lpw0	djnz	_loopw
 	push	hl
 	ld	bc, (SAVEBC)
 	jp	(iy)
@@ -120,6 +110,9 @@ nbcont	ld	a,(bc)
 zbcont	inc	bc
 	inc	bc
 	jp	(iy)
+	;; ----------------------------------------------------
+	defcode 'UBRANCH',7,0,UBRANCH
+	jr	nbcont
 	;; ---------------------------------------------------- 
 	defcode	'NBRANCH',7,0,NBRANCH
 	pop	hl
@@ -130,3 +123,9 @@ zbcont	inc	bc
 	dec	h
 	jr	NZ, nbcont
 	jr	zbcont
+	;; ---------------------------------------------------- 
+	defword	'DOUBLE',6,0,DOUBLE
+	defw	DUP
+	defw	ADD
+	defw	SEMI
+	

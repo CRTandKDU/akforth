@@ -22,6 +22,13 @@ DOCOL	dec	ix		; IP -> RSP
 	ld	c,e		; W -> IP
 	ld	b,d
 	jp	(iy)
-EXECUTE	defw	EXECUTE+2	
-	pop	hl
+EXECUTE	pop	hl
+	inc	hl
+	inc	hl
+	ld	a, (hl)
+	and	f_msk
+	ld	e, a
+	ld	d, 0
+	add	hl, de
+	inc 	hl
 	jr	RUN
