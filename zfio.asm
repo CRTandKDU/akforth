@@ -1,15 +1,17 @@
+	;; ---------------------------------------------------- 
+	;; INPUT PARSING, DICTIONARY SEARCH
 	;; ----------------------------------------------------
 	defcode 'FIND',4,0,FIND
-	ld	a,(STATE)
+	ld	a,(vSTATE)
 	cp	1		; In compile mode?
 	jr	NZ, ffind	; No: search word/number
-	ld	hl, SKIP	; Yes: As if we parsed SKIP
+	ld	hl, DROP	; Yes: As if we parsed DROP
 	push	hl
 	jp	(iy)
 ffind	exx
 	ld	hl, WORDFLG
 	ld	(hl), 0x0
-	ld	hl, LATEST
+	ld	hl, vLATEST
 flast	ld	e, (hl)
 	inc	hl
 	ld	d, (hl)
@@ -28,10 +30,18 @@ ftest	ld	de, WORDBUF	; Compare length (Pascal)
 	inc	hl
 	ld	a, (de)
 	ld	b, a
-	ld	a, (hl)
+	ld	a, (vSTATE)	; Is state INTERPRETING?
+	inc	a
+	dec	a
+	jr	Z, fmlen	; Yes: compare len w/o flag
+	ld	a, (hl)		; i.e. unhide words
 	and	a, f_msk
 	cp	b
 	jr	NZ, fnext	; Check next word
+	jr	fmatch
+fmlen	ld	a, (hl)		; No: compare len w flag
+	cp	b		; i.e. hide words
+	jr	NZ, fnext
 fmatch	inc	de
 	inc	hl
 	ld	a, (de)

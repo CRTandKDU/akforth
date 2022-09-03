@@ -32,3 +32,22 @@ label	defw	`c`label
 `c`label	
 	endm
 	;;
+defvar	macro	name, namelen, flags, label, initial
+	defcode	name, namelen, flags, label
+	ld	hl, `v`label
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	push	de
+	jp	(iy)
+`v`label	defw	initial
+	endm
+
+defconstant	macro	name, namelen, flags, label, value
+	defcode name, namelen, flags, label
+	ld	hl, value
+	push	hl
+	jp	(iy)
+	endm
+	
+	

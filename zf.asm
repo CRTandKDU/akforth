@@ -20,7 +20,7 @@ START	xor	a
 	ld	ix, SECRSP
 	ld	a,0x41
 	push	af
-	ld	bc, _VM
+	ld	bc, _BOOT
 	jp	NEXT
 	;; 
 DONE$	defw	DONE$+2
@@ -28,18 +28,15 @@ PUTS	pop	hl		; Top of stack in hl
 	call	0a9aH		; Move hl to acc
 	call	0fbdH		; Convert to ascii
 	call	2f0aH		; Print
-	jp	06ccH
+	jp	06ccH		; Jump out to BASIC
 include zfinner.asm	
 include	zfmacro.asm
 include zfprim.asm
 include zfouter.asm	
 include zfio.asm
 	;; 
-LATEST	defw	nPROMPT
-HERE	defw	SECUSER
-STATE	defb	0x0	
 	;; 
-MSG	defb	'Z80 FORTH',0x0D,0
+MSG	defb	'Z80 FORTH',0x0D,'(cold)',0x0D,0
 OK	defb	'OK> ',0	
 SAVEBC	defw	0x0
 BUFP	defw	BUFFER		; Parsing pointer in BUFFER
@@ -51,6 +48,7 @@ SECRSP	defb	0x0
 	;; Outer interpreter loop in FORTH
 	;;   _ Address prefix
 	;;   $ Secondary word suffix
+_BOOT	defw	COLD	
 _VM	defw	PROMPT, INLINE
 _NXTWD	defw	WORD, ZBRANCH, _VM
 	defw	FIND, DUP, NBRANCH, _EXEWD, DONE$
