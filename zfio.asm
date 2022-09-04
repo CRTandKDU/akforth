@@ -127,6 +127,13 @@ cntout
 wdone	exx
 	jp	(iy)
 	;; ----------------------------------------------------
+	defcode	'CR',2,0,CARRTN
+	ld	(SAVEBC), bc
+	ld	a, 0x0d
+	call	0033H
+	ld	bc, (SAVEBC)
+	jp	(iy)
+	;; ----------------------------------------------------
 	defcode 'PROMPT',6,0,PROMPT
 	ld	(SAVEBC), bc
 	ld	hl, OK

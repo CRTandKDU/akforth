@@ -35,10 +35,7 @@ label	defw	`c`label
 defvar	macro	name, namelen, flags, label, initial
 	defcode	name, namelen, flags, label
 	ld	hl, `v`label
-	ld	e, (hl)
-	inc	hl
-	ld	d, (hl)
-	push	de
+	push	hl
 	jp	(iy)
 `v`label	defw	initial
 	endm

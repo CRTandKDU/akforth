@@ -32,6 +32,7 @@ PUTS	pop	hl		; Top of stack in hl
 include zfinner.asm	
 include	zfmacro.asm
 include zfprim.asm
+include zfcontrol.asm	
 include zfouter.asm	
 include zfio.asm
 	;; 
