@@ -1,15 +1,5 @@
-	;; ---------------------------------------------------- 
-	;; OUTER INTERPRETER/COMPILER
-	;; ----------------------------------------------------
-	defconstant '0',1,0,ZERO,0x0
-	defconstant 'TRUE',4,0,TRUE,0x1
-	defconstant 'FALSE',5,0,FALSE,0x0	
-	;; ----------------------------------------------------
-	defvar 'LATEST',6,0,LATEST,nPROMPT
-	defvar 'HERE',4,0,HERE,SECUSER
-	defvar 'STATE',5,f_hid,STATE,0x0
-	;; ----------------------------------------------------
-	defcode 'COLD',4,0,COLD
+;;; ----------------------------------------------------
+defcode 'COLD',4,0,COLD
 	ld	hl, nPROMPT
 	ld	(vLATEST), hl
 	ld	hl, SECUSER
@@ -17,8 +7,8 @@
 	ld	hl, 0x0
 	ld	(vSTATE), hl
 	jp	(iy)
-	;; ----------------------------------------------------
-	defcode 'INTERPRET',9,0,INTERPRET
+;;; ----------------------------------------------------
+defcode 'INTERPRET',9,0,INTERPRET
 	ld	a, (vSTATE)
 	inc	a
 	dec	a
@@ -94,8 +84,8 @@ comp3	ld	de, LIT		; Literal compile to LIT <lit>
 	inc	hl
 	ld	(vHERE), hl
 	jp	(iy)
-	;;
-	defcode ';',1,f_imm,SEMICOLON
+;;;
+defcode ";",1,f_imm,SEMICOLON
 	ld	de, SEMI
 	ld	hl, (vHERE)
 	ld	(hl), e
@@ -106,9 +96,9 @@ comp3	ld	de, LIT		; Literal compile to LIT <lit>
 	ld	a, 0
 	ld	(vSTATE), a
 	jp	(iy)
-	;; 
-	defcode	':',1,0,COLON
+	;;; 
+defcode	':',1,0,COLON
 	ld	a, 1
 	ld	(vSTATE), a
 	jp	(iy)
-	;; 
+	;;; 

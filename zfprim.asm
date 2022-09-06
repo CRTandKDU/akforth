@@ -1,7 +1,17 @@
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'SKIP',4,0,SKIP
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ---------------------------------------------------- 
+;;; OUTER INTERPRETER/COMPILER
+;;; ----------------------------------------------------
+defconstant '0',1,0,ZERO,0x0
+defconstant 'TRUE',4,0,TRUE,0x1
+defconstant 'FALSE',5,0,FALSE,0x0	
+;;;; ----------------------------------------------------
+defvar 'LATEST',6,0,LATEST,nPROMPT
+defvar 'HERE',4,0,HERE,SECUSER
+defvar 'STATE',5,f_hid,STATE,0x0
+;;; ----------------------------------------------------
 defcode '.',1,0,DOT
 	ld	(SAVEBC), bc
 	pop	hl
@@ -12,22 +22,22 @@ defcode '.',1,0,DOT
 	call	033H		; destroys de
 	ld	bc, (SAVEBC)
 	jp	(iy)
-;; ---------------------------------------------------- 
-;; MEMORY PRIMITIVES
-;; ----------------------------------------------------
+;;; ---------------------------------------------------- 
+;;; MEMORY PRIMITIVES
+;;; ----------------------------------------------------
 defcode	'C!',2,0,CSTR
 	pop	hl
 	pop	de
 	ld	(hl), e
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'C@',1,0,CFTCH
 	pop	hl
 	ld	e, (hl)
 	ld	d, 0x0
 	push	de
 	jp	(iy)
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode	'!',1,0,STORE
 	pop	hl
 	pop	de
@@ -35,7 +45,7 @@ defcode	'!',1,0,STORE
 	inc	hl
 	ld	(hl), d
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'@',1,0,FETCH
 	pop	hl
 	ld	e, (hl)
@@ -45,7 +55,7 @@ defcode	'@',1,0,FETCH
 	jp	(iy)
 defcode	'&',1,0,ALTFTC
 	jr	cFETCH
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode	'CMOVE',5,0,CMOVE
 	exx
 	pop	bc
@@ -64,9 +74,9 @@ cmovend	exx
 	jp	(iy)
 cldir	ldir
 	jr	cmovend
-;; ---------------------------------------------------- 
-;; RETURN STACK PRIMITIVES
-;; ----------------------------------------------------
+;;; ---------------------------------------------------- 
+;;; RETURN STACK PRIMITIVES
+;;; ----------------------------------------------------
 defcode '>R',2,0,TOR
 	pop	hl
 	dec	ix		; (SP) -> RSP
@@ -74,7 +84,7 @@ defcode '>R',2,0,TOR
 	dec	ix
 	ld	(ix+0),l
 	jp	(iy)
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode 'R>',2,,FROMR	; (RSP) -> SP
 	ld	l,(ix+0)
 	inc	ix
@@ -82,30 +92,30 @@ defcode 'R>',2,,FROMR	; (RSP) -> SP
 	inc	ix
 	push	hl
 	jp	(iy)
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode 'R&',2,,RSPTOP	; (RSP) -> SP
 	push	bc
 	jp	(iy)
-;; ---------------------------------------------------- 
-;; STACK PRIMITIVES
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
+;;; STACK PRIMITIVES
+;;; ---------------------------------------------------- 
 defcode 'DROP',4,0,DROP
 	pop	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'SWAP',4,0,SWAP
 	pop	hl
 	pop	de
 	push	hl
 	push	de
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'DUP',3,0,DUP
 	pop	hl
 	push	hl
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'OVER',4,0,OVER
 	pop	hl
 	pop	de
@@ -113,7 +123,7 @@ defcode	'OVER',4,0,OVER
 	push	hl
 	push	de
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'ROT',3,0,ROT
 	exx
 	pop	hl
@@ -124,7 +134,7 @@ defcode	'ROT',3,0,ROT
 	push	de
 	exx
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode '?DUP',4,0,QDUP
 	pop	hl
 	push	hl
@@ -137,9 +147,19 @@ defcode '?DUP',4,0,QDUP
 	jp	(iy)
 _qdup	push	hl	
 	jp	(iy)
-;; ---------------------------------------------------- 
-;; TESTING TOS VALUES
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
+defcode	'PICK',4,0,PICK
+	pop	hl
+	add	hl, hl
+	add	hl, sp
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	push	de
+	jp	(iy)
+;;; ---------------------------------------------------- 	
+;;; TESTING TOS VALUES
+;;; ----------------------------------------------------
 defcode	'=',1,0,EQUAL
 	pop	hl
 	pop	de
@@ -147,7 +167,7 @@ defcode	'=',1,0,EQUAL
 	sbc	hl, de
 	jp	Z, cTRUE
 	jp	cFALSE
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'<',1,0,LTHAN
 	pop	de
 	pop	hl
@@ -155,7 +175,7 @@ defcode	'<',1,0,LTHAN
 	sbc	hl, de
 	jp	M, cTRUE
 	jp	cFALSE
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'>',1,0,GTHAN
 	pop	de
 	pop	hl
@@ -163,7 +183,7 @@ defcode	'>',1,0,GTHAN
 	sbc	hl, de
 	jp	M, cFALSE
 	jp	cTRUE
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'0=',2,0,ZEQUAL
 	pop	hl
 	ld	de, 0x0
@@ -171,28 +191,30 @@ defcode	'0=',2,0,ZEQUAL
 	sbc	hl, de
 	jp	Z, cTRUE
 	jp	cFALSE
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'NOT',3,0,BNOT
 	jr	cZEQUAL
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
+;;; POSITIVE OR NEGATIVE (not strictly)
+;;; ----------------------------------------------------
 defcode	'0<',2,0,ZNEG
 	pop	hl
 	ld	de, 0x0
 	or	a
 	sbc	hl, de
-	jp	M, cTRUE
+	jp	C, cTRUE
 	jp	cFALSE
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'0>',2,0,ZPOS
 	pop	hl
 	ld	de, 0x0
 	or	a
 	sbc	hl, de
-	jp	M, cFALSE
+	jp	C, cFALSE
 	jp	cTRUE
-;; ---------------------------------------------------- 
-;; BITWISE LOGICAL PRIMITIVES
-;; ----------------------------------------------------
+;;; ---------------------------------------------------- 
+;;; BITWISE LOGICAL PRIMITIVES
+;;; ----------------------------------------------------
 defcode	'AND',3,0,LGAND
 	pop	hl
 	pop	de
@@ -204,7 +226,7 @@ defcode	'AND',3,0,LGAND
 	ld	h, a
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'OR',2,0,LGOR
 	pop	hl
 	pop	de
@@ -216,7 +238,7 @@ defcode	'OR',2,0,LGOR
 	ld	h, a
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'XOR',3,0,LGXOR
 	pop	hl
 	pop	de
@@ -228,58 +250,58 @@ defcode	'XOR',3,0,LGXOR
 	ld	h, a
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
-;; INTEGER ARITHMETICS 8b and 16b
-;; ---------------------------------------------------- 
+;;; ----------------------------------------------------
+;;; INTEGER ARITHMETICS 8b and 16b
+;;; ---------------------------------------------------- 
 defcode	'NEGATE',6,0,LGNOT
 	pop	de
 	ld	hl, 0x0
 	sbc	hl, de
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'1+',2,0,INC
 	pop	hl
 	inc	hl
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'1-',2,0,DEC
 	pop	hl
 	dec	hl
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'2+',2,0,INC2
 	pop	hl
 	inc	hl
 	inc	hl
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode	'2-',2,0,DEC2
 	pop	hl
 	dec	hl
 	dec	hl
 	push	hl
 	jp	(iy)
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode '+',1,0,ADD
 	pop	de
 	pop	hl
 	add	hl,de
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode '-',1,0,SUB
 	pop	de
 	pop	hl
 	sbc	hl,de
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
-;; Unsigned mults from [[https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication]]
-;; ---------------------------------------------------- 
+;;; ----------------------------------------------------
+;;; Unsigned mults from [[https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication]]
+;;; ---------------------------------------------------- 
 defcode	'BB*',3,0,BBMUL
 	ld	(SAVEBC), bc	; This prim uses b, multiplies h by e and places the result in hl
 	pop	de		; Keep lower byte in e
@@ -299,7 +321,7 @@ _loopb:
 	ld	bc, (SAVEBC)
 	push	hl
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'WB*',3,0,WBMUL
 	ld	(SAVEBC), bc	;  multiplies de by a into hl
 	pop	de
@@ -315,9 +337,9 @@ _lpw0	djnz	_loopw
 	push	hl
 	ld	bc, (SAVEBC)
 	jp	(iy)
-;; ---------------------------------------------------- 
-;; LITERAL NUMBERS IN COMPILED (USER-DEFINED) WORDS
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
+;;; LITERAL NUMBERS IN COMPILED (USER-DEFINED) WORDS
+;;; ---------------------------------------------------- 
 defcode	'LIT',3,f_hid,LIT
 	ld	a,(bc)
 	ld	l,a
@@ -327,9 +349,9 @@ defcode	'LIT',3,f_hid,LIT
 	inc 	bc
 	push	hl
 	jp	(iy)
-;; ---------------------------------------------------- 
-;; 1-WORD JUMP CONTROL STRUCTURES
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
+;;; 1-WORD JUMP CONTROL STRUCTURES
+;;; ---------------------------------------------------- 
 defcode	'ZBRANCH',7,0,ZBRANCH
 	pop	hl
 	inc	l
@@ -349,10 +371,10 @@ nbcont	ld	a,(bc)
 zbcont	inc	bc
 	inc	bc
 	jp	(iy)
-;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'UBRANCH',7,0,UBRANCH
 	jr	nbcont
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
 defcode	'NBRANCH',7,0,NBRANCH
 	pop	hl
 	inc	l
@@ -362,9 +384,52 @@ defcode	'NBRANCH',7,0,NBRANCH
 	dec	h
 	jr	NZ, nbcont
 	jr	zbcont
-;; ---------------------------------------------------- 
-;; PERKS (also for test)
-;; ---------------------------------------------------- 
+;;; ---------------------------------------------------- 
+;;; PERKS (also for test)
+;;; ---------------------------------------------------- 
+defcode 'WORDS',5,0,WORDS
+	exx
+	ld	hl, (vLATEST)
+nxtwd	push	hl
+	ld	e, (hl)		; Next word in DE
+	inc	hl
+	ld	d, (hl)
+	ld	a, (de)		; Is next word 0x0000?
+	inc	a
+	dec	a
+	jr	NZ, prtwd
+	inc	de
+	ld	a, (de)
+	inc	a
+	dec	a
+	pop	hl
+	jr	Z, quitwd
+prtwd	pop	hl		; Keep word addr
+	push	hl
+	inc	hl
+	inc	hl
+	ld	a, (hl)
+	and	a, f_msk	; Word length
+	ld	c, a
+	ld	b, 0
+	inc	hl
+	ld	de, WORDBUF	; Copy to WORDBUF
+	ldir
+	xor	a
+	ld	(de), a		; 0-terminates
+	ld	hl, WORDBUF
+	call	28a7H		; Print WORDBUF
+	ld	a, 0x20
+	call	33H		; Print space
+	pop	hl		; Jump to next word
+	ld	e, (hl)
+	inc	hl
+	ld	d, (hl)
+	ex	de, hl
+	jr	nxtwd
+quitwd	exx
+	jp	(iy)
+;;; ----------------------------------------------------
 defword	'DOUBLE',6,0,DOUBLE
 	defw	DUP
 	defw	ADD

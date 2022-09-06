@@ -1,7 +1,7 @@
 	;; ---------------------------------------------------- 
 	;; INPUT PARSING, DICTIONARY SEARCH
 	;; ----------------------------------------------------
-	defcode 'FIND',4,0,FIND
+defcode 'FIND',4,0,FIND
 	ld	a,(vSTATE)
 	cp	1		; In compile mode?
 	jr	NZ, ffind	; No: search word/number
@@ -9,7 +9,7 @@
 	push	hl
 	jp	(iy)
 ffind	exx
-	ld	hl, WORDFLG
+	ld	hl, WORDFLG	; Used to signal word/lit
 	ld	(hl), 0x0
 	ld	hl, vLATEST
 flast	ld	e, (hl)
@@ -60,8 +60,8 @@ notfd	pop	hl
 	push	hl
 fdone	exx
 	jp	(iy)
-	;; ----------------------------------------------------
-	defcode 'INLINE',6,0,INLINE
+;;; ----------------------------------------------------
+defcode 'INLINE',6,0,INLINE
 	exx
 	ld	hl, BUFFER
 	ld	(40A7H), hl
@@ -75,8 +75,8 @@ fdone	exx
 	call	0361H
 	exx
 	jp	(iy)
-	;; ----------------------------------------------------
-	defcode 'WORD',4,0,WORD
+;;; ----------------------------------------------------
+defcode 'WORD',4,0,WORD
 	exx
 	ld	hl, (BUFP)
 	ld	a,(hl)
@@ -127,14 +127,14 @@ cntout
 wdone	exx
 	jp	(iy)
 	;; ----------------------------------------------------
-	defcode	'CR',2,0,CARRTN
+defcode	'CR',2,0,CARRTN
 	ld	(SAVEBC), bc
 	ld	a, 0x0d
 	call	0033H
 	ld	bc, (SAVEBC)
 	jp	(iy)
 	;; ----------------------------------------------------
-	defcode 'PROMPT',6,0,PROMPT
+defcode 'PROMPT',6,0,PROMPT
 	ld	(SAVEBC), bc
 	ld	hl, OK
 	call	2f0aH
