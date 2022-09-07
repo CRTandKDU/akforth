@@ -1,17 +1,19 @@
-	;; ---------------------------------------------------- 
-	;; INPUT PARSING, DICTIONARY SEARCH
-	;; ----------------------------------------------------
+;;; ---------------------------------------------------- 
+;;; INPUT PARSING, DICTIONARY SEARCH
+;;; ----------------------------------------------------
 defcode 'FIND',4,0,FIND
 	ld	a,(vSTATE)
-	cp	1		; In compile mode?
+	cp	1		; In step 1 compile mode?
 	jr	NZ, ffind	; No: search word/number
-	ld	hl, DROP	; Yes: As if we parsed DROP
-	push	hl
 	jp	(iy)
 ffind	exx
 	ld	hl, WORDFLG	; Used to signal word/lit
-	ld	(hl), 0x0
-	ld	hl, vLATEST
+	ld	(hl), 0x0	; Reset before search
+	ld	de, WORDBUF+1	; Check for literal string
+	ld	a, (de)
+	cp	0x22
+	jr	Z, fstr		; Yes 
+	ld	hl, vLATEST	; No: search dictionary
 flast	ld	e, (hl)
 	inc	hl
 	ld	d, (hl)
@@ -51,10 +53,23 @@ fmatch	inc	de
 found	jr	fdone		; Leave hl on stack
 fnext	pop	hl
 	jr	flast
-notfd	pop	hl
+fstr	ld	hl, WORDBUF	; Copy word to user mem w/o
+	ld	c, (hl)		; opening double quote
+	dec	c
+	ld	b, 0x00
+	ld	de, (vHERE)
+	push	de
+	inc	hl
+	inc	hl
+	ldir
+	ld	(vHERE), de
+	ld	hl, WORDFLG	; Signal a literal
+	ld	(hl), f_lit
+	jr	fdone
+notfd	pop	hl		; Not a word -> a number
 	ld	hl, WORDBUF+1	; P+C convention
 	call	1e5aH		; Convert to hex in DE
-	ld	hl, WORDFLG
+	ld	hl, WORDFLG	; Signal a literal
 	ld	(hl), f_lit
 	ex	de, hl
 	push	hl
@@ -126,19 +141,28 @@ cntout
 	push 	hl
 wdone	exx
 	jp	(iy)
-	;; ----------------------------------------------------
+;;; ----------------------------------------------------
+defcode	'TYPE',4,0,TYPE	
+	exx
+	pop	hl
+	call	28a7H
+	ld	a, 0x20
+	call	0033H
+	exx
+	jp	(iy)
+;;; ----------------------------------------------------
 defcode	'CR',2,0,CARRTN
 	ld	(SAVEBC), bc
 	ld	a, 0x0d
 	call	0033H
 	ld	bc, (SAVEBC)
 	jp	(iy)
-	;; ----------------------------------------------------
+;;; ----------------------------------------------------
 defcode 'PROMPT',6,0,PROMPT
 	ld	(SAVEBC), bc
 	ld	hl, OK
 	call	2f0aH
 	ld	bc, (SAVEBC)
 	jp	(iy)
-	;; 
+;;; 
 	

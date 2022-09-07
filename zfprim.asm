@@ -385,7 +385,7 @@ defcode	'NBRANCH',7,0,NBRANCH
 	jr	NZ, nbcont
 	jr	zbcont
 ;;; ---------------------------------------------------- 
-;;; PERKS (also for test)
+;;; PERKS (also for tests)
 ;;; ---------------------------------------------------- 
 defcode 'WORDS',5,0,WORDS
 	exx
@@ -427,7 +427,9 @@ prtwd	pop	hl		; Keep word addr
 	ld	d, (hl)
 	ex	de, hl
 	jr	nxtwd
-quitwd	exx
+quitwd	ld	a, 0x0d
+	call	0033H
+	exx
 	jp	(iy)
 ;;; ----------------------------------------------------
 defword	'DOUBLE',6,0,DOUBLE
