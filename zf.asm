@@ -10,8 +10,9 @@
 	;;   SP    sp Stack pointer
 	;;   W     de Working register, Word address
 	;;   X     hl Scratch register
-	org 7000H
-START	xor	a
+	org 	7000H
+START	call 	01c9H
+	xor	a
 	ld	(409cH),a
 	ld	hl, MSG
 	call	2f0aH
