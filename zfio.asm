@@ -1,4 +1,107 @@
 ;;; ---------------------------------------------------- 
+;;; SAVE/LOAD DICTIONARY TO/FROM TAPE
+;;; ----------------------------------------------------
+defcode 'WLOAD',5,0,WLOAD
+	exx
+	xor	a
+	call	0212H
+	;; Skip BASIC leader
+	call	0296H
+	call	0314H		; Ignore d3d3
+	call	0314H		; Ignore d3'F'
+	call	0314H		; Read vLATEST into hl
+	ld	(vLATEST), hl
+	call	0314H		; Read vHERE
+	ld	(vHERE), hl
+	;; Load dictionary
+	ex	de, hl
+	ld	hl, SECUSER
+wlblock	push	hl
+	push	de
+	ex	de, hl
+	xor	a
+	sbc	hl, de
+	inc	h
+	dec	h
+	jr	NZ, wl255
+	inc	l
+	dec	l
+	jr	NZ, wlless
+	pop	de
+	pop	hl
+	call	01f8H
+	exx
+	jp	(iy)
+wl255	ld	b, 0xff
+wltop	pop	de
+	pop	hl
+wlloop	call	0235h
+	ld	(hl), a
+	inc	hl
+	djnz	wlloop
+	jr	wlblock
+wlless	ld	b, l
+	jr	wltop
+defcode 'WSAVE',5,0,WSAVE
+	exx
+	;; BASIC leader
+	or	a
+	call	0212H
+	call	0287H
+	ld	a, 0xd3
+	call	0264H
+	ld	a, 0xd3
+	call	0264H
+	ld	a, 0xd3
+	call	0264H
+	ld	a, 'F'
+	call	0264H
+	;; 
+	ld	hl, (vLATEST)
+	ld	de, (vHERE)
+	ld	a, l
+	call	0264H
+	ld	a, h
+	call	0264H
+	ld	a, e
+	call	0264H
+	ld	a, d
+	call	0264H
+	;; Save dictionary
+	ld	hl, SECUSER
+	ld	de, (vHERE)
+wsblock	push	hl
+	push	de
+	ex	de, hl
+	or	a
+	sbc	hl, de
+	inc	h
+	dec	h
+	jr	NZ, ws255
+	inc	l
+	dec	l
+	jr	NZ, wsless
+	pop	de
+	pop	hl
+	;; BASIC Tailer
+	ld	a, 0x00
+	call	0264H
+	ld	a, 0x00
+	call	0264H
+	call	01f8H
+	exx
+	jp	(iy)
+ws255	ld	b, 0xff
+wstop	pop	de
+	pop	hl
+wsloop	ld	a, (hl)
+	call	0264H
+	inc	hl
+	djnz	wsloop
+	jr	wsblock
+wsless	ld	b, l
+	jr	wstop
+;;; ---------------------------------------------------- 
 ;;; INPUT PARSING, DICTIONARY SEARCH
 ;;; ----------------------------------------------------
 defcode 'FIND',4,0,FIND

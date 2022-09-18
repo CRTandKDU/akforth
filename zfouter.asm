@@ -50,7 +50,7 @@ comp1	cp	1		; Creating new word header?
 	jp	(iy)
 comp2	ld	a, (WORDFLG)
 	and	f_lit
-	jp	NZ, comp3		; Is this a LIT?
+	jp	NZ, comp3	; Is this a LIT?
 	pop	hl
 	push	hl
 	inc	hl
