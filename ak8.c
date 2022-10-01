@@ -12,13 +12,6 @@
 // M-x imenu-list-minor-mode
 #include <stdio.h>
 
-#define lambda(lambda$_ret, lambda$_args, lambda$_body)\
-({\
-lambda$_ret lambda$__anon$ lambda$_args\
-lambda$_body\
-&amp;lambda$__anon$;\
-})
-
 static int RUNNING = 1;
 static int errno = 0;
 
@@ -539,6 +532,28 @@ static void f_constant(void){
   *code++ = xt_leave;
 }
 
+static void f_variable(void){
+  char *w=word();
+  cell_t  v = (cell_t) sp_pop();
+  cell_t  *addr = (cell_t *) MALLOC( sizeof(cell_t) );
+  *addr = v;
+  add_word(w, f_docol);
+  *code++ = xt_lit;
+  *code++ = (xt_t *) addr;
+  *code++ = xt_leave;
+}
+
+static void f_put(void){
+  cell_t *addr = (cell_t *) sp_pop();
+  cell_t val  = (cell_t) sp_pop();
+  *addr = val;
+}
+
+static void f_get(void){
+  cell_t *addr = (cell_t *) sp_pop();
+  sp_push( (cell_t) *addr );
+}
+
 static void f_see(void) {
   f_tick();
   xt_t *xt=(xt_t*)(*sp);
@@ -606,6 +621,12 @@ static void register_primitives(void) {
   add_word("<=",	f_infeq );
 
   add_word("constant",  f_constant);
+  latest->has_lit=1;
+  add_word("variable",  f_variable);
+  latest->has_lit=1;
+
+  add_word("!", f_put);
+  add_word("@", f_get);
   
   xt_hello = add_word("hello",	f_hello_world); // say hello world
   xt_drop=add_word("drop",	f_drop);	// discard top of stack
