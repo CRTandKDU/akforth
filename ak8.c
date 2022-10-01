@@ -241,10 +241,15 @@ static xt_t *xt_dup,
   *xt_gstdin,
   *xt_bye,
   *xt_lit,
+  *xt_sup,
   *xt_leave,
   *xt_branch,
   *xt_0branch,
-  *xt_1branch; // some execution tokens need for compiling
+  *xt_1branch,
+  *xt_i,
+  *xt_rppushs,
+  *xt_sppushr,
+  *xt_rpclean;
 
 static int is_compile_mode; // course03: we are either interpreting or compiling
 #ifndef CODE_SIZE
@@ -256,6 +261,12 @@ static xt_t *code_base[CODE_SIZE], **code=code_base, **code_end=code_base+CODE_S
 static xt_t *compile(xt_t *xt) ;
 static void interpreting(char *w) ;
 
+static void pstack(){
+  cell_t *i;
+  xt_t ***j;
+  printf("\tSP STACK> "); for( i=sp_base;i<=sp;i++) printf("%d ", *i); printf("\n");
+  printf("\tRP STACK> "); for( j=rp_base;j<=rp;j++) printf("%d ", *j); printf("\n");
+}  
 
 // UTILITIES and PARSING INPUT
 // ---------------------------------------------------------------------------------
@@ -473,32 +484,105 @@ static void f_swap(void) {
 	sp[-1]=t;
 }
 
-static void f_if(void) { // macro, execute at compiletime
-  *code++=xt_0branch;
-  sp_push((cell_t)code++); // push forward reference on stack
+static void f_over(void){
+  sp_push( sp[-1] );
 }
 
-static void f_else(void) { // macro, execute at compiletime
+static void f_rot(void){
+  cell_t a = sp_pop();
+  cell_t b = sp_pop();
+  cell_t c = sp_pop();
+  sp_push( b );
+  sp_push( a );
+  sp_push( c );
+}
+
+static void f_and(void){
+  cell_t a = sp_pop();
+  cell_t b = sp_pop();
+  sp_push( a & b );
+}
+
+static void f_or(void){
+  cell_t a = sp_pop();
+  cell_t b = sp_pop();
+  sp_push( a | b );
+}
+
+static void f_xor(void){
+  cell_t a = sp_pop();
+  cell_t b = sp_pop();
+  sp_push( a ^ b );
+}
+
+static void f_not(void){
+  cell_t a = sp_pop();
+  sp_push( ~a );
+}
+
+static void f_if(void) {	// macro, execute at compiletime
+  *code++=xt_0branch;
+  sp_push((cell_t)code++);	// push forward reference on stack
+}
+
+static void f_else(void) {	// macro, execute at compiletime
   xt_t ***dest=(void*)sp_pop(); // pop address (from f_if) 
-  *code++=xt_branch; // compile a jump
+  *code++=xt_branch;		// compile a jump
   sp_push((cell_t)code++); 
   *dest=code; 
 }
 
-static void f_then(void) { // macro, execute at compiletime
+static void f_then(void) {	// macro, execute at compiletime
   xt_t ***dest=(void*)sp_pop();
-  *dest=code; // resolve forward reference given by f_if or f_else
+  *dest=code;			// resolve forward reference given by f_if or f_else
 }
-static void f_begin(void) { // macro, execute at compiletime
-  sp_push((cell_t)code); // push current compilation address for loop
+
+static void f_begin(void) {	// macro, execute at compiletime
+  sp_push((cell_t)code);	// push current compilation address for loop
 }
-static void f_while(void) { // macro, execute at compiletime
-  *code++=xt_1branch; // compile a jump if not zero
-  *code++=(void*)sp_pop(); // jump back to f_begin address
+
+// Uncounted loops
+static void f_while(void) {	// macro, execute at compiletime
+  *code++=xt_1branch;		// compile a jump if not zero
+  *code++=(void*)sp_pop();	// jump back to f_begin address
 }
-static void f_again(void) { // macro, execute at compiletime, unconditional loop
-  *code++=xt_branch; // compile a jump 
-  *code++=(void*)sp_pop();// jump back to f_begin address
+
+static void f_until(void) {	// macro, execute at compiletime
+  *code++=xt_0branch;		// compile a jump if not zero
+  *code++=(void*)sp_pop();	// jump back to f_begin address
+}
+
+static void f_again(void) {	// macro, execute at compiletime, unconditional loop
+  *code++=xt_branch;		// compile a jump 
+  *code++=(void*)sp_pop();	// jump back to f_begin address
+}
+
+// Counted loops: using the return stack!
+static void f_do(void){
+  *code++ = xt_rppushs;
+  sp_push( (cell_t)code );
+}
+
+static void rp_clean(void){ rp_pop(); rp_pop(); }
+static void rp_pushs(void){ rp_push( (xt_t **) sp[-1] ); rp_push( (xt_t **) *sp ); sp_pop(); sp_pop();}
+static void sp_pushr(void){
+  cell_t limit = (cell_t) rp_pop();
+  cell_t curix = (cell_t) rp_pop();
+  curix += 1;
+  rp_push( (xt_t **) curix );
+  rp_push( (xt_t **) limit );
+  sp_push( curix );
+  sp_push( limit );
+}
+
+static void f_i(void){ sp_push( (cell_t) rp[-1]  ); }
+
+static void f_loop(void){
+  *code++ = xt_sppushr;
+  *code++ = xt_sup;
+  *code++ = xt_0branch;
+  *code++ = (xt_t *) sp_pop();
+  *code++ = xt_rpclean;
 }
 
 static void f_exit(void) { ip=rp_pop(); }
@@ -604,6 +688,11 @@ static void f_get_stdin(void){
 /* continue at 1.1. */
 
 static void register_primitives(void) {
+  // Utilities:
+  xt_rpclean = add_word( "rp_clean", rp_clean );
+  xt_rppushs = add_word( "rp_pushs", rp_pushs );
+  xt_sppushr = add_word( "sp_pushr", sp_pushr );
+  
   add_word("+",		f_add);
   add_word("-",		f_sub);
   add_word("/",		f_div);
@@ -615,10 +704,15 @@ static void register_primitives(void) {
   add_word("<0",	f_neg );
   add_word(">=0",	f_poseq );
   add_word("<=0",	f_negeq );
-  add_word(">",		f_sup );
+  xt_sup = add_word(">",		f_sup );
   add_word("<",		f_inf );
   add_word(">=",	f_supeq );
   add_word("<=",	f_infeq );
+
+  add_word("and", f_and );
+  add_word("or",  f_or);
+  add_word("xor", f_xor);
+  add_word("not", f_not);
 
   add_word("constant",  f_constant);
   latest->has_lit=1;
@@ -632,6 +726,8 @@ static void register_primitives(void) {
   xt_drop=add_word("drop",	f_drop);	// discard top of stack
   xt_dup=add_word("dup",	f_dup);
   xt_swap=add_word("swap",	f_swap);
+  add_word("rot", f_rot);
+  add_word("over", f_over);
   add_word("words",		f_words);	// list all defined words
   add_word("type",		f_type);	// course02, output string
   add_word(".",			f_dot);		// course02, output number
@@ -661,7 +757,7 @@ static void register_primitives(void) {
   xt_word=add_word("word",			f_word);
   xt_interpreting=add_word("interpreting",	f_interpreting);
 
-  // Immediate words (should be in dictionary w. IMMEDIATE flag
+  // Immediate words (should be in dictionary w. IMMEDIATE flag)
   /* definitions=&macros; */
   add_word(";",		f_semis);				// course03, end of new word, leave compile mode
   latest->immediate=1;
@@ -673,10 +769,18 @@ static void register_primitives(void) {
   latest->immediate=1;
   add_word("begin",	f_begin);				// begin of while loop
   latest->immediate=1;
-  add_word("while",	f_while);				// while loop (condition at end of loop)
+  add_word("while",	f_while);				// begin...while loop (condition at end of loop)
+  latest->immediate=1;
+  add_word("until",	f_until);				// begin...until loop (condition at end of loop)
   latest->immediate=1;
   add_word("again",	f_again);				// unconditional loop to begin
   latest->immediate=1;
+  add_word("do",	f_do);				// unconditional loop to begin
+  latest->immediate=1;
+  add_word("loop",	f_loop);				// unconditional loop to begin
+  latest->immediate=1;
+  xt_i = add_word("i",	f_i);				// unconditional loop to begin
+  
 
   /* definitions=&dictionary; */
 }
