@@ -10,6 +10,7 @@
 // Hints:
 // M-: (require 'imenu-list)
 // M-x imenu-list-minor-mode
+
 #include <stdio.h>
 
 static int RUNNING = 1;
@@ -55,8 +56,7 @@ void *CALLOC( unsigned long long num, unsigned long long len ){
 /* Classes of ANSI characters */
 #define UC(c)	((int)c)
 int  isupper(int c) { return ( c >= UC('A') && c <= UC('Z') ) ? 1 : 0; }
-int  isalpha(int c){
-  return ((c >= UC('a') && c <= UC('z')) || (c >= UC('A') && c <= UC('Z')) ? 1 : 0); }
+int  isalpha(int c){ return ((c >= UC('a') && c <= UC('z')) || (c >= UC('A') && c <= UC('Z')) ? 1 : 0); }
 int  isdigit(int c){ return (c >= UC('0') && c <= UC('9') ? 1 : 0); }
 int  isspace(int c){
   return (c == '\t' || c == '\n' ||
@@ -202,6 +202,7 @@ typedef struct xt_t { // Execution Token
   struct xt_t **data; // address into high level code
   short has_lit; // does consume the next ip as literal (0branch, 1branch, lit)
   short immediate;
+  short hidden;
 } xt_t;
 
 // DICTIONARY
@@ -354,6 +355,7 @@ static xt_t *add_word(char *name, void (*prim)(void)) {
     xt->data		= code; // current high level code pointer, compilation target
     xt->has_lit		= 0;
     xt->immediate	= 0;
+    xt->hidden          = 0;
   }
   return latest = xt;
 }
@@ -408,7 +410,7 @@ static void f_drop(void) {sp_pop();} // drop top of stack
 
 static void f_words(void) { // display all defined words
   xt_t *w;
-  for(w=dictionary;w;w=w->next) printf("%s ", w->name);
+  for(w=dictionary;w;w=w->next) if(!w->hidden) printf("%s ", w->name);
   printf("\n");
 }
 
@@ -418,6 +420,20 @@ static void f_dot(void) {
 
 static void f_type(void){ // course02
   fputs((char*)sp_pop(), stdout);
+}
+
+static void f_stringeq(void){
+  char *s1 = (char *)sp_pop();
+  char *s2 = (char *)sp_pop();
+  sp_push( STRCMP( s1, s2 ) ? (cell_t) 0 : (cell_t) 1 );
+}
+
+static void f_accept(void){
+  // Due to I/O implementation `accept' has to be the last word on a line
+  static char *acceptbuf[ 32 ];
+  char *ignore;
+  ignore = gets( (char *)acceptbuf );
+  sp_push( (cell_t) STRDUP( (char *)acceptbuf ) );  
 }
 
 static void f_cr(void){ // course02, newline
@@ -453,6 +469,16 @@ static void f_colon() { // course03, define a new word
   char *w=word(); // read next word which becomes the word name
   add_word(STRDUP(w), f_docol);
   is_compile_mode=1; // switch to compile mode
+}
+
+static void f_create(){
+  char *w=word(); // read next word which becomes the word name
+  add_word(STRDUP(w), f_docol);
+}
+
+static void f_comma(){
+  xt_t *xt = (xt_t *) sp_pop();
+  *code++ = xt;
 }
 
 static void f_semis(void) { // course03, macro, end of definition
@@ -689,9 +715,9 @@ static void f_get_stdin(void){
 
 static void register_primitives(void) {
   // Utilities:
-  xt_rpclean = add_word( "rp_clean", rp_clean );
-  xt_rppushs = add_word( "rp_pushs", rp_pushs );
-  xt_sppushr = add_word( "sp_pushr", sp_pushr );
+  xt_rpclean = add_word( "rp_clean", rp_clean ); latest->hidden=1;
+  xt_rppushs = add_word( "rp_pushs", rp_pushs ); latest->hidden=1;
+  xt_sppushr = add_word( "sp_pushr", sp_pushr ); latest->hidden=1;
   
   add_word("+",		f_add);
   add_word("-",		f_sub);
@@ -730,30 +756,35 @@ static void register_primitives(void) {
   add_word("over", f_over);
   add_word("words",		f_words);	// list all defined words
   add_word("type",		f_type);	// course02, output string
+  add_word("string=",           f_stringeq);    //
+  add_word("accept",            f_accept );
   add_word(".",			f_dot);		// course02, output number
   add_word("cr",		f_cr);		// course02, output CR
   add_word(":",			f_colon);	// course03, define new word, enter compile mode
+  add_word("create",		f_create);	// course03, define new word, do not enter compile mode
+  add_word(",",                 f_comma);
 
   add_word("exit",		f_exit);	// same as leave but leave is used to recognize the end of assembling
   add_word("'",			f_tick);	// ' <word> => execution token on stack
   add_word("execute",		f_execute);	// ' <word> => execution token on stack
   add_word("see",		f_see);		// see <word> list FORTH code for <word>
   add_word("dis",		f_dis);		// dis ( ip--) until leave, disassemble
-  add_word("xt>data",		f_xt_to_data);
-  add_word("xt>name",		f_xt_to_name);
+  latest->hidden=1;
+  add_word("xt>data",		f_xt_to_data); latest->hidden=1;
+  add_word("xt>name",		f_xt_to_name); latest->hidden=1;
   xt_sstdin =add_word("stdin!", f_set_stdin);
   xt_gstdin =add_word("stdin@", f_get_stdin);
 
   xt_bye=add_word("bye",			f_bye);
-  xt_leave=add_word("leave",			f_leave);
-  xt_lit=add_word("lit",			f_lit);
+  xt_leave=add_word("leave",			f_leave); latest->hidden=1;
+  xt_lit=add_word("lit",			f_lit); latest->hidden=1;
   latest->has_lit=1;
   xt_0branch=add_word("0branch",		f_0branch);	// jump if zero
-  latest->has_lit=1;
+  latest->has_lit=1; latest->hidden=1;
   xt_1branch=add_word("1branch",		f_1branch);	// jump if not zero
-  latest->has_lit=1;
+  latest->has_lit=1; latest->hidden=1;
   xt_branch =add_word("branch",			f_branch);	// unconditional jump
-  latest->has_lit=1;
+  latest->has_lit=1; latest->hidden=1;
   xt_word=add_word("word",			f_word);
   xt_interpreting=add_word("interpreting",	f_interpreting);
 
