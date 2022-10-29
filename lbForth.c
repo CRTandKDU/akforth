@@ -164,7 +164,7 @@ const char *initScript =
     ": COUNTPOS SWAP 1 + SWAP BASE @ / ?DUP IF RECURSE THEN ;\n"
     ": DIGITS DUP 0< IF 1 ELSE 0 THEN SWAP COUNTPOS ;\n"
     ": .R OVER DIGITS - SPACES . ;\n"
-    ": . . SPACE ;\n"
+    ": . . CR ;\n"
     ": ? @ . ;\n"
     ": .S DSP@ BEGIN DUP S0@ > WHILE DUP ? CELL - REPEAT DROP ;\n"
     ": TYPE 0 DO DUP C@ EMIT 1 + LOOP DROP ;\n"
@@ -672,8 +672,9 @@ BUILTIN(38, "QUIT", quit, 0)
 
         if (errorFlag)
             *sp = *rsp = 1;
-        else if (!keyWaiting() && !(*initscript_pos))
+        else if (!keyWaiting() && !(*initscript_pos)){
             tell(" OK\n");
+	}
     }
 }
 

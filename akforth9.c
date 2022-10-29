@@ -16,7 +16,7 @@
 #include <stdio.h>
 
 #define GET_LO_CHAR(a)      *((unsigned char *)&a)
-#define GET_HI_CHAR(a)      *(((unsigned char *)&a) + 1)
+#define GET_HI_CHAR(a)       *(((unsigned char *)&a) + 1)
 
 static short RUNNING	= 1;
 static short errno	= 0;
@@ -282,14 +282,14 @@ static xt_t *find(xt_t *dict, char *w) { // find word either in dictionary or ma
 }
 
 static void ok(void) { // print data stack, then ok>
-  cell_t *i;
-  printf( "\n\033[36mSTORE: [%6d / %6d]\n\033[0m", store - store_base, store_end - store_base );
-  printf( "\033[36mSTACK: [%6d / %6d]\n\033[0m", sp - sp_base, sp_end - sp_base );
-  printf( "\033[36mRETST: [%6d / %6d]\n\033[0m", rp - rp_base, rp_end - rp_base );
-  printf( "\033[36mCODES: [%6d / %6d]\n\033[0m", code - code_base, code_end - code_base );
-  for(i=sp_base;i<=sp;i++) printf("%d ", *i);
-  printf("ok> ");
-  /* if(*sp) printf( "%d", *sp ); */
+  /* cell_t *i; */
+  /* printf( "\n\033[36mSTORE: [%6d / %6d]\n\033[0m", store - store_base, store_end - store_base ); */
+  /* printf( "\033[36mSTACK: [%6d / %6d]\n\033[0m", sp - sp_base, sp_end - sp_base ); */
+  /* printf( "\033[36mRETST: [%6d / %6d]\n\033[0m", rp - rp_base, rp_end - rp_base ); */
+  /* printf( "\033[36mCODES: [%6d / %6d]\n\033[0m", code - code_base, code_end - code_base ); */
+  /* for(i=sp_base;i<=sp;i++) printf("%d ", *i); */
+  /* fprintf(stdout, "ok> "); */
+  if(*sp) fprintf( stdout, "%d\n", *sp );
 }
 
 static int next_char(FILE * stream) {
@@ -302,7 +302,7 @@ static int next_char(FILE * stream) {
 static int skip_space_comments(FILE * stream) {
   int ch;
   while((ch=next_char(stream)) && isspace(ch));
-  while( '(' == ch ){
+  if( '(' == ch ){
     while( (ch = next_char(stream)) && (')' != ch) );
     while((ch=next_char(stream)) && isspace(ch));
   }
@@ -406,7 +406,7 @@ static void f_supeq(void)  { int v1=sp_pop(); int v2=sp_pop(); sp_push( (cell_t)
 static void f_infeq(void)  { int v1=sp_pop(); int v2=sp_pop(); sp_push( (cell_t)( v2 <= v1 ? 1 : 0 )); }
 
 static void f_hello_world(void) {
-  printf("akFORTH (mem unit: %d; stack cell: %d)\nok> ", sizeof((size_t)1), sizeof(cell_t));
+  /* printf("akFORTH (mem unit: %d; stack cell: %d)\nok> ", sizeof((size_t)1), sizeof(cell_t)); */
 }
 
 static void f_bye(void){ RUNNING = 0; }
@@ -621,12 +621,6 @@ static void f_unloop(void) {
   rp_clean();
 }
 
-// Access to return stack: handle with care!
-static void f_rpush(void){ cell_t tos = sp_pop(); rp_push( (xt_t **) tos ); }
-static void f_rpop(void){ xt_t **tors = rp_pop(); sp_push( (cell_t)tors ); }
-static void f_rget(void){ sp_push( (cell_t) *rp ); }
-static void f_rset(void){ rp_pop(); rp_push( (xt_t **)sp_pop() ); }
-
 static void f_dis(void) {
   xt_t **ip=(void*)sp_pop();
   for(; (*ip)->prim!=f_leave;ip++) {
@@ -784,10 +778,6 @@ static void register_primitives(void) {
   xt_rpclean = add_word( "rp_clean", rp_clean ); latest->hidden=1;
   xt_rppushs = add_word( "rp_pushs", rp_pushs ); latest->hidden=1;
   xt_sppushr = add_word( "sp_pushr", sp_pushr ); latest->hidden=1;
-  add_word( ">R", f_rpush );
-  add_word( "R>", f_rpop );
-  add_word( "R@", f_rget );
-  add_word( "R!", f_rset );
   
   add_word("+",		f_add);
   add_word("-",		f_sub);
@@ -946,36 +936,51 @@ int main( int argc, char **argv ) {
   /*          IF STDIN! AGAIN */
   /*          ELSE BYE ; */
   
-  add_word("shell",f_docol);		// define a new high level word
-  xt_t **cold   = code;			// Cold boot entry
-  *code++       = xt_hello;		// Banner message
-  if( 1 < argc ){			// Push FORTH source files in the command line
-    *code++	= xt_lit;
-    *code++	= (xt_t *)0;
-    for( short i = 1; i < argc; i++ ){
-      *code++ = xt_lit;
-      *code++ = (xt_t *)STRDUP( argv[i] );
-    }
-    *code++ = xt_sstdin;
-  }
+  /* add_word("shell",f_docol);		// define a new high level word */
+  /* xt_t **cold   = code;			// Cold boot entry */
+  /* *code++       = xt_hello;		// Banner message */
+  /* /\* if( 1 < argc ){			// Push FORTH source files in the command line *\/ */
+  /* /\*   *code++	= xt_lit; *\/ */
+  /* /\*   *code++	= (xt_t *)0; *\/ */
+  /* /\*   for( short i = 1; i < argc; i++ ){ *\/ */
+  /* /\*     *code++ = xt_lit; *\/ */
+  /* /\*     *code++ = (xt_t *)STRDUP( argv[i] ); *\/ */
+  /* /\*   } *\/ */
+  /* /\*   *code++ = xt_sstdin; *\/ */
+  /* /\* } *\/ */
 
-  xt_t **begin	= code;			// save current code pointer for loop back
-  *code++	= xt_word;		// get the next word on data stack
+  /* *code++	= xt_lit; */
+  /* *code++	= (xt_t *)0; */
+  /* xt_t **begin	= code;			// save current code pointer for loop back */
+  /* *code++	= xt_word;		// get the next word on data stack */
+  /* *code++	= xt_dup; */
+  /* *code++	= xt_0branch;		// jump to end if top of stack is null */
+  /* xt_t **here	= code++;		// forward jump reference */
+  /* *code++	= xt_interpreting;	// interpret/compile word on top of stack */
+  /* *code++	= xt_branch;		// loop back to begin of this word */
+  /* *code++	= (void*)begin;		// Loop back address */
+  /* *here		= (void*)code;		// resolve reference */
+  /* *code++	= xt_drop; */
+
+  /* *code++       = xt_gstdin; */
+  /* *code++       = xt_0branch; */
+  /* *code++       = xt_bye; */
+  /* *code++	= xt_sstdin; */
+  /* *code++	= xt_branch;		// loop back to begin of this word */
+  /* *code++	= (void*)begin;		// Loop back address */
+
+  add_word("shell",f_docol);// define a new high level word
+  xt_t **cold	= code;       // save current code pointer for loop back
+  *code++	= xt_word;         // get the next word on data stack
   *code++	= xt_dup;
-  *code++	= xt_0branch;		// jump to end if top of stack is null
-  xt_t **here	= code++;		// forward jump reference
-  *code++	= xt_interpreting;	// interpret/compile word on top of stack
-  *code++	= xt_branch;		// loop back to begin of this word
-  *code++	= (void*)begin;		// Loop back address
-  *here		= (void*)code;		// resolve reference
+  *code++	= xt_0branch;      // jump to end if top of stack is null
+  xt_t **here	= code++;      // forward jump reference
+  *code++	= xt_interpreting; // interpret/compile word on top of stack
+  *code++	= xt_branch;       // loop back to begin of this word
+  *code++	= (void*)cold;    // Loop back address
+  *here		= (void*)code;       // resolve reference
   *code++	= xt_drop;
-
-  *code++       = xt_gstdin;
-  *code++       = xt_0branch;
-  *code++       = xt_bye;
-  *code++	= xt_sstdin;
-  *code++	= xt_branch;		// loop back to begin of this word
-  *code++	= (void*)begin;		// Loop back address
+  *code++	= xt_bye;          // leave VM
 
   ip=cold;				// set instruction pointer
   vm();					// and run the vm
