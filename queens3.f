@@ -1,5 +1,8 @@
 ( -*- mode: forth;  -*- )
 
+( Search solution: B 0 solve )
+( Print  solution: B board )
+
 0 variable CALLS
 
 : 2dup dup >R swap dup >R swap R> R> ;

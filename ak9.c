@@ -20,6 +20,7 @@
 
 static short RUNNING	= 1;
 static short errno	= 0;
+static short BASE       = 10;
 
 // Some functions are reimplemented (simplistically) to break some dependencies
 // ---------------------------------------------------------------------------------
@@ -203,9 +204,10 @@ typedef unsigned long long cell_t;
 typedef struct xt_t { // Execution Token
   struct xt_t *next;
   char *name;
+  cell_t *clientdata;
   void (*prim)(void);
   struct xt_t **data; // address into high level code
-  short has_lit; // does consume the next ip as literal (0branch, 1branch, lit)
+  short has_lit;      // does consume the next ip as literal (0branch, 1branch, lit...)
   short immediate;
   short hidden;
 } xt_t;
@@ -247,6 +249,9 @@ static xt_t *xt_dup,
   *xt_gstdin,
   *xt_bye,
   *xt_lit,
+  /* *xt_jmp, */
+  *xt_jmp_continue,
+  *xt_continue,
   *xt_sup,
   *xt_leave,
   *xt_branch,
@@ -271,7 +276,7 @@ static void pstack(void){
   cell_t *i;
   xt_t ***j;
   printf("\tSP STACK> "); for( i=sp_base;i<=sp;i++) printf("%d ", *i); printf("\n");
-  printf("\tRP STACK> "); for( j=rp_base;j<=rp;j++) printf("%d ", *j); printf("\n");
+  printf("\tRP STACK> "); for( j=rp_base;j<=rp;j++) printf("\t%d %x\n", *j, *j); printf("\n");
 }  
 
 // UTILITIES and PARSING INPUT
@@ -356,6 +361,7 @@ static xt_t *add_word(char *name, void (*prim)(void)) {
     xt->next		= *definitions;
     *definitions	= xt;
     xt->name		= STRDUP(name);
+    xt->clientdata      = (cell_t *)0;
     xt->prim		= prim;
     xt->data		= code; // current high level code pointer, compilation target
     xt->has_lit		= 0;
@@ -386,6 +392,13 @@ static xt_t **rp_pop(void) {
   return *rp--;
 }
 
+// Access to return stack: handle with care!
+static void f_rpush(void){ cell_t tos = sp_pop(); rp_push( (xt_t **) tos ); }
+static void f_rpop(void){ xt_t **tors = rp_pop(); sp_push( (cell_t)tors ); }
+static void f_rget(void){ sp_push( (cell_t) *rp ); }
+static void f_rset(void){ rp_pop(); rp_push( (xt_t **)sp_pop() ); }
+
+
 // PRIMITIVES and BUILTINS
 // --------------------------------------------------------------------------------
 static void f_mul(void) { int v1=sp_pop(); *sp*=v1; }
@@ -393,6 +406,7 @@ static void f_add(void) { int v1=sp_pop(); *sp+=v1; }
 static void f_sub(void) { int v1=sp_pop(); *sp-=v1; }
 static void f_div(void) { int v1=sp_pop(); *sp/=v1; }
 static void f_mod(void) { int v1=sp_pop(); *sp%=v1; }
+static void f_muldiv(void) { int v1=sp_pop(); int v2=sp_pop(); *sp *= v2; *sp /= v1; }
 
 static void f_zerop(void)  { int v1=sp_pop(); sp_push( (cell_t)( v1 == 0 ? 1 : 0 )); }
 static void f_nzerop(void) { int v1=sp_pop(); sp_push( (cell_t)( v1 == 0 ? 0 : 1 )); }
@@ -420,8 +434,22 @@ static void f_words(void) { // display all defined words
 }
 
 static void f_dot(void) {
-  printf("%d ", sp_pop());
+  switch( BASE ){
+  case 8:
+    printf("%o ", sp_pop());
+    break;
+  case 16:
+    printf("%X ", sp_pop());
+    break;
+  default:
+    printf("%d ", sp_pop());
+    break;
+  }
 }
+
+static void f_decimal(void){ BASE=10; }
+static void f_hexadecimal(void){ BASE=16; }
+static void f_octal(void){ BASE=8; }
 
 static void f_type(void){ // course02
   fputs((char*)sp_pop(), stdout);
@@ -446,12 +474,42 @@ static void f_cr(void){ // course02, newline
   fputc('\n', stdout);
 }
 
+//
 static void f_leave(void) { // course03, return from subroutine
   ip=rp_pop();
 }
 
+// VM WORDS
+// Generally hidden, handle interactions between interpreptation/compilation
+// ---------------------------------------------------------------------------------
+
+/* ‘lit’ is a word used at compile time, added before numerical/text constants. */
+/* At interpretation time it pushes the next instruction as a value. */
 static void f_lit(void) {
   sp_push((cell_t)*ip++);
+}
+
+/* ‘jmp’ is the ghost-word for ‘does>’. It installs the remaining code list  */
+/* in the caller of ‘does>’ as the code list of the latest word just created. */
+/* static void f_jmp(void){ */
+/*   printf( "code: %d %X\n", code, code ); */
+/*   printf( "data: %d %X\n", latest->data, latest->data ); */
+/*   latest->data = (xt_t **) (*ip); */
+/*   f_leave(); */
+/* } */
+
+/* ‘jmpcont’ is the first ghost-word for ‘does+>’. It installs the remaining code list  */
+/* in the caller of ‘does>’ at the end of the code list of the latest word just created. */
+/* This is implementd by a second ghost-word ‘cont’ which is interpreted in the newly created word. */
+static void f_jmp_continue(void){
+  *code++ = xt_continue;
+  *code++ =  (xt_t *) *ip;
+  f_leave();
+}
+
+static void f_continue(void){
+  /* Like docol */
+  ip = (xt_t **)(*ip);
 }
 
 static xt_t *compile(xt_t *xt) {
@@ -467,7 +525,7 @@ static void literal(cell_t value) {
 static void f_docol(void) { // course03, VM: enter function (word)new 
   rp_push(ip); // at runtime push current ip on return stack
   ip=current_xt->data; // and continue at the high level code
-  /* data will be set in add_word() and represent the
+  /* data has been set in add_word() and represent the
      current dictionary pointer */
 }
 
@@ -482,16 +540,53 @@ static void f_create(){
   add_word(STRDUP(w), f_docol);
 }
 
+/* ‘does>’: lots of literature and discussion on its workings. */
+/* Its effect is to set code for the latest word created as the */
+/* sequence following it. Implemented here with “ghost-words” */
+/* static void f_does(){ */
+/*   cell_t val; */
+/*   /\* printf( "code: %d %X\n", code, code ); *\/ */
+/*   compile( xt_jmp ); */
+/*   val = (cell_t)(code + 1); */
+/*   *code++ = (xt_t *)val; */
+/* } */
+
+/* ‘does+>’ effect is to add to code for the latest word created the */
+/* sequence following it. Implemented here with “ghost-words” */
+/* See also: [[https://www.forth.com/starting-forth/11-forth-compiler-defining-words/]] */
+static void f_doesplus(){
+  cell_t val;
+  compile( xt_jmp_continue );
+  val = (cell_t)(code + 1);
+  *code++ = (xt_t *)val;
+}
+
 static void f_comma(){
   xt_t *xt = (xt_t *) sp_pop();
   *code++ = xt;
 }
+
+static void f_code(){
+  sp_push( (cell_t) &code );
+}
+
+static void f_lbrac(){
+  is_compile_mode=0; // switch mode, has to be IMMEDIATE
+}
+
+static void f_rbrac(){
+  is_compile_mode=1; // switch mode, matches opening lbrac only
+}
+
+static void f_literal(){   literal( sp_pop() ); }
 
 static void f_semis(void) { // course03, macro, end of definition
   *code++=xt_leave; // compile return from subroutine
   is_compile_mode=0; // switch back to interpret mode
 }
 
+// CONTROL STRUCTURES
+// ---------------------------------------------------------------------------------
 static void f_branch(void) { ip=(void*)*ip; } // unconditional jump
 
 static void f_0branch(void) { // jump if top of stack is zero
@@ -508,17 +603,13 @@ static void f_word(void) { sp_push((cell_t)word()); }
 
 static void f_interpreting(void) { interpreting((void*)sp_pop()); }
 
+// STACK WORDS
+// ---------------------------------------------------------------------------------
 static void f_dup(void){cell_t t=*sp; sp_push(t);}
 
-static void f_swap(void) {
-	cell_t t=*sp;
-	*sp=sp[-1];
-	sp[-1]=t;
-}
+static void f_swap(void) { cell_t t=*sp; *sp=sp[-1]; sp[-1]=t; }
 
-static void f_over(void){
-  sp_push( sp[-1] );
-}
+static void f_over(void){ sp_push( sp[-1] ); }
 
 static void f_rot(void){
   cell_t a = sp_pop();
@@ -621,22 +712,17 @@ static void f_unloop(void) {
   rp_clean();
 }
 
-// Access to return stack: handle with care!
-static void f_rpush(void){ cell_t tos = sp_pop(); rp_push( (xt_t **) tos ); }
-static void f_rpop(void){ xt_t **tors = rp_pop(); sp_push( (cell_t)tors ); }
-static void f_rget(void){ sp_push( (cell_t) *rp ); }
-static void f_rset(void){ rp_pop(); rp_push( (xt_t **)sp_pop() ); }
-
 static void f_dis(void) {
   xt_t **ip=(void*)sp_pop();
   for(; (*ip)->prim!=f_leave;ip++) {
     xt_t *xt=*ip;
     if(xt->has_lit) {
-      printf("%p %s %p\n", ip, xt->name, ip[1]);
+      printf("%X %s %X\n", ip, xt->name, ip[1]);
       ip++;
     } else {
-      printf("%p %s\n", ip, xt->name);
+      printf("%X %s\n", ip, xt->name);
     }
+    if( xt_continue == xt ) break;
   }
 }
 
@@ -688,8 +774,15 @@ static void f_get(void){
 static void f_see(void) {
   f_tick();
   xt_t *xt=(xt_t*)(*sp);
-  *sp=(cell_t)xt->data;
-  f_dis();
+  printf( "next: %d %x\n", &(xt->next), &(xt->next) ); 
+  printf( "name: %d %x %s\n", &(xt->name), &(xt->name), xt->name ); 
+  printf( "cdat: %d %x %d\n", &(xt->clientdata), &(xt->clientdata), xt->clientdata ); 
+  printf( "prim: %d %x\n", &(xt->prim), &(xt->prim) ); 
+  printf( "data: %d %x %X: %X\n", &(xt->data), &(xt->data), xt->data, *(xt->data) );
+  if( *(xt->data) ){
+    *sp=(cell_t)xt->data;
+    f_dis();
+  }
 }
 
 static void f_execute(void) {
@@ -705,6 +798,15 @@ static void f_xt_to_name(void) {
 
 static void f_xt_to_data(void) {
 	*sp=(cell_t)((xt_t*)*sp)->data;
+}
+
+static void f_xt_to_clientdata(void) { 
+	*sp=(cell_t)((xt_t*)*sp)->clientdata;
+}
+
+static void f_xt_set_clientdata(void){
+  xt_t *xt = (xt_t *)sp_pop();
+  xt->clientdata = (cell_t *) sp_pop();
 }
 
 static void f_set_stdin(void){
@@ -784,48 +886,53 @@ static void register_primitives(void) {
   xt_rpclean = add_word( "rp_clean", rp_clean ); latest->hidden=1;
   xt_rppushs = add_word( "rp_pushs", rp_pushs ); latest->hidden=1;
   xt_sppushr = add_word( "sp_pushr", sp_pushr ); latest->hidden=1;
-  add_word( ">R", f_rpush );
-  add_word( "R>", f_rpop );
-  add_word( "R@", f_rget );
-  add_word( "R!", f_rset );
-  
+  add_word( ">R",	f_rpush );
+  add_word( "R>",	f_rpop );
+  add_word( "R@",	f_rget );
+  add_word( "R!",	f_rset );
+  // Arithmetics
   add_word("+",		f_add);
   add_word("-",		f_sub);
   add_word("/",		f_div);
   add_word("%",		f_mod);
-  add_word("*",		f_mul);		//top of stack (TOS) * next of stack => TOS
+  add_word("*",		f_mul);
+  add_word("*/",        f_muldiv);
   add_word("0=",	f_zerop );
   add_word("0<>",	f_nzerop );
   add_word(">0",	f_pos );
   add_word("<0",	f_neg );
   add_word(">=0",	f_poseq );
   add_word("<=0",	f_negeq );
-  xt_sup = add_word(">",		f_sup );
+  xt_sup = add_word(">",f_sup );
   add_word("<",		f_inf );
   add_word(">=",	f_supeq );
   add_word("<=",	f_infeq );
-
-  add_word("and", f_and );
-  add_word("or",  f_or);
-  add_word("xor", f_xor);
-  add_word("not", f_not);
-
+  // Logicals
+  add_word("and",	f_and );
+  add_word("or",	f_or);
+  add_word("xor",	f_xor);
+  add_word("not",	f_not);
+  // Base
+  add_word("decimal",	f_decimal);
+  add_word("octal",	f_octal);
+  add_word("hex",	f_hexadecimal);
+  // Defining words
   add_word("constant",  f_constant);
   latest->has_lit=1;
   add_word("variable",  f_variable);
   latest->has_lit=1;
-
-  add_word("!", f_put);
-  add_word("C!", f_putbyte);
-  add_word("@", f_get);
-  add_word("C@", f_get);
+  // Memory load/store
+  add_word("!",		f_put);
+  add_word("C!",	f_putbyte);
+  add_word("@",		f_get);
+  add_word("C@",	f_get);
   
   xt_hello = add_word("hello",	f_hello_world); // say hello world
   xt_drop=add_word("drop",	f_drop);	// discard top of stack
   xt_dup=add_word("dup",	f_dup);
   xt_swap=add_word("swap",	f_swap);
-  add_word("rot", f_rot);
-  add_word("over", f_over);
+  add_word("rot",		f_rot);
+  add_word("over",		f_over);
   add_word("words",		f_words);	// list all defined words
   add_word("type",		f_type);	// course02, output string
   add_word("string=",           f_stringeq);    //
@@ -834,7 +941,13 @@ static void register_primitives(void) {
   add_word("cr",		f_cr);		// course02, output CR
   add_word(":",			f_colon);	// course03, define new word, enter compile mode
   add_word("create",		f_create);	// course03, define new word, do not enter compile mode
+  /* add_word("does>",		f_does); latest->immediate=1; */
+  add_word("does>",		f_doesplus); latest->immediate=1;
   add_word(",",                 f_comma);
+  add_word(",@",                f_code);
+  add_word("[",                 f_lbrac); latest->immediate=1;
+  add_word("]",                 f_rbrac);
+  add_word("literal",           f_literal); latest->immediate=1;
 
   add_word("unloop",		f_unloop);	// stop and exit a do loop
   add_word("'",			f_tick);	// ' <word> => execution token on stack
@@ -843,22 +956,26 @@ static void register_primitives(void) {
   add_word("dis",		f_dis);		// dis ( ip--) until leave, disassemble
   latest->hidden=1;
   add_word("xt>data",		f_xt_to_data); latest->hidden=1;
+  add_word("xt>clientdata@",	f_xt_to_clientdata); latest->hidden=1;
+  add_word("xt>clientdata!",	f_xt_set_clientdata); latest->hidden=1;
   add_word("xt>name",		f_xt_to_name); latest->hidden=1;
   xt_sstdin =add_word("stdin!", f_set_stdin);
   xt_gstdin =add_word("stdin@", f_get_stdin);
 
-  xt_bye=add_word("bye",			f_bye);
-  xt_leave=add_word("leave",			f_leave);
-  xt_lit=add_word("lit",			f_lit); latest->hidden=1;
-  latest->has_lit=1;
-  xt_0branch=add_word("0branch",		f_0branch);	// jump if zero
-  latest->has_lit=1; latest->hidden=1;
-  xt_1branch=add_word("1branch",		f_1branch);	// jump if not zero
-  latest->has_lit=1; latest->hidden=1;
-  xt_branch =add_word("branch",			f_branch);	// unconditional jump
-  latest->has_lit=1; latest->hidden=1;
-  xt_word=add_word("word",			f_word);
-  xt_interpreting=add_word("interpreting",	f_interpreting);
+  xt_bye =		add_word("bye",			f_bye);
+  xt_leave =		add_word("leave",		f_leave);
+  xt_lit =		add_word("lit",			f_lit); latest->hidden = 1; latest->has_lit = 1;
+  /* xt_jmp =		add_word("jmp",			f_jmp); latest->hidden = 1; latest->has_lit = 1; */
+  xt_jmp_continue =	add_word("jmpcont",		f_jmp_continue); latest->hidden = 1; latest->has_lit = 1;
+  xt_continue =		add_word("cont",		f_continue); latest->hidden = 1; latest->has_lit = 1;
+  xt_0branch =		add_word("0branch",		f_0branch);	// jump if zero
+  latest->has_lit = 1; latest->hidden = 1;
+  xt_1branch =		add_word("1branch",		f_1branch);	// jump if not zero
+  latest->has_lit = 1; latest->hidden = 1;
+  xt_branch  =		add_word("branch",		f_branch);	// unconditional jump
+  latest->has_lit = 1; latest->hidden = 1;
+  xt_word =		add_word("word",		f_word);
+  xt_interpreting =	add_word("interpreting",	f_interpreting);
 
   // Extensions
   add_word( "alloc", f_alloc );
@@ -907,7 +1024,7 @@ static void compiling(char *w) { // course03
       {  *code++=current_xt; }
   } else {					// not found, may be a number
     char *end;
-    int number=STRTOL(w, &end, 0);
+    int number=STRTOL(w, &end, BASE);
     if(*end) terminate("WU Error");		// word unknown
     else literal(number);			// compile a number literal
   }
@@ -921,7 +1038,7 @@ static void interpreting(char *w) {
     current_xt->prim();
   } else {					// not found, may be a number
     char *end;
-    int number=STRTOL(w, &end, 0);
+    int number=STRTOL(w, &end, BASE);
     if(*end) terminate("WU Error");
     else sp_push(number);
   }
