@@ -1,0 +1,6 @@
+(defun lsp-forth--lsp-command ()
+  "Generate LSP startup command."
+  `("node"
+    "--stdio"
+    "C:\\Users\\jmchauvet\\Documents\\forth\\blacklist-server\\index.js"))
+
