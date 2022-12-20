@@ -1,48 +1,62 @@
+// The FORTH Checker module. Monday, December 19, 2022
+
+const checkOrder = ( arr, defwords ) => {
+    const dictionary = ["shell", "i", "loop", "do", "again", "until", "while", "begin", "else", "then", "if", ";", "alloc", "interpreting", "word", "branch", "1branch", "0branch", "cont", "jmpcont", "lit", "leave", "bye", "stdin@", "stdin!", "xt>name", "xt>clientdata!", "xt>clientdata@", "xt>data", "dis", "see", "execute", "'", "unloop", "literal", "]", "[", ",@", ",", "does>", "create", ":", "cr", ".", "accept", "string=", "type", "words", "over", "rot", "swap", "dup", "drop", "hello", "C@", "@", "C!", "!", "variable", "constant", "hex", "octal", "decimal", "not", "xor", "or", "and", "<=", ">=", "<", ">", "<=0", ">=0", "<0", ">0", "0<>", "0=", "*/", "*", "%", "/", "-", "+", "R!", "R@", "R>", ">R", "sp_pushr", "rp_pushs", "rp_clean", "pstack"];
+
+    // Simple syntax check for proper ordering of source words in an incrementally growing dictionary
+    let res=[], current_dictionary=dictionary;
+    for( i in arr ){
+	if( !current_dictionary.includes( arr[i].value ) ){
+	    let j = defwords.map( o => o.word ).indexOf(arr[i-1].value);
+	    console.error( arr[i].value + ', ' + arr[i-1].value + ', ' + j );
+	    if( ':' == arr[i-1].value || (j>= 0 && defwords[j].scope > 0)  )
+		current_dictionary.push( arr[i].value );
+	    else
+		res.push( arr[i] );
+	}
+    }
+    return res;
+};
+
 const gotoImplementation = ( text, fragment )=> {
     const dictionary = ["shell", "i", "loop", "do", "again", "until", "while", "begin", "else", "then", "if", ";", "alloc", "interpreting", "word", "branch", "1branch", "0branch", "cont", "jmpcont", "lit", "leave", "bye", "stdin@", "stdin!", "xt>name", "xt>clientdata!", "xt>clientdata@", "xt>data", "dis", "see", "execute", "'", "unloop", "literal", "]", "[", ",@", ",", "does>", "create", ":", "cr", ".", "accept", "string=", "type", "words", "over", "rot", "swap", "dup", "drop", "hello", "C@", "@", "C!", "!", "variable", "constant", "hex", "octal", "decimal", "not", "xor", "or", "and", "<=", ">=", "<", ">", "<=0", ">=0", "<0", ">0", "0<>", "0=", "*/", "*", "%", "/", "-", "+", "R!", "R@", "R>", ">R", "sp_pushr", "rp_pushs", "rp_clean", "pstack"];
-    const regex = new RegExp(`:[ \\n\\r]+(${fragment})[ \\n\\r]+`, 'gi');
+    const regex = new RegExp(`([=%><@\\+\\-\\*\\/\\'\\[\\]\\;\\:\\,\\!\\w]+)[ \\n\\r]+(${fragment})[ \\n\\r]+`, 'gi');
     const results = [];
-
+    // Test first for a number
     if( !isNaN( fragment ) ){
 	results.push({
 	    value: fragment,
-	    index: -1
+	    index: -1,
+	    prefix: null
 	});
     }
     else{
+	// Test for a FORTH primitive
 	if( dictionary.includes( fragment ) ){
 	    results.push({
 		value: fragment,
-		index: -1
+		index: -1,
+		prefix: null
 	    });
 	}
 	else{
 	    regex.lastIndex = 0;
+	    let defwords = getDefiningWords(text);
 	    while ((matches = regex.exec(text)) && results.length < 100) {
-		results.push({
-		    value: matches[0],
-		    index: matches.index,
-		});
+		let j = defwords.map( o => o.word ).indexOf( matches[1] );
+		if( ':' == matches[1] || (j>= 0 && defwords[j].scope > 0) )
+		    results.push({
+			value: matches[0],
+			index: matches.index,
+			prefix:matches[1]
+		    });
 	    }
 	}
     }
     return results;
 };
 
-const getUndefinedWords = (text) => {
-    const dictionary = ["shell", "i", "loop", "do", "again", "until", "while", "begin", "else", "then", "if", ";", "alloc", "interpreting", "word", "branch", "1branch", "0branch", "cont", "jmpcont", "lit", "leave", "bye", "stdin@", "stdin!", "xt>name", "xt>clientdata!", "xt>clientdata@", "xt>data", "dis", "see", "execute", "'", "unloop", "literal", "]", "[", ",@", ",", "does>", "create", ":", "cr", ".", "accept", "string=", "type", "words", "over", "rot", "swap", "dup", "drop", "hello", "C@", "@", "C!", "!", "variable", "constant", "hex", "octal", "decimal", "not", "xor", "or", "and", "<=", ">=", "<", ">", "<=0", ">=0", "<0", ">0", "0<>", "0=", "*/", "*", "%", "/", "-", "+", "R!", "R@", "R>", ">R", "sp_pushr", "rp_pushs", "rp_clean", "pstack"];
-
-    
-/*
-    const raw = text
-    // Split on blanks
-	  .split(/[ \n\r]+/g)
-    // Remove blank lines
-	  .filter((p) => p.trim());
-
-    let results = filterConstNaNs( filterConstStrings( filterComments( raw ) ) );
-*/
-    
+const getOrderedWords = (text) => {
     const filterComments = (arr) => {
 	let word, res = [], skipping = false;
 	for( i in arr ){
@@ -74,32 +88,56 @@ const getUndefinedWords = (text) => {
     
 
     const regex = new RegExp("\\( |\\)[ \\n\\r]|[=%><@\"\\+\\-\\*\\/\\'\\[\\]\\;\\:\\,\\!\\w]+", 'gi');
-    let words = [], filtered;
+    let words = [];
     regex.lastIndex = 0;
-    while ((matches = regex.exec(text)) && words.length < 100) {
+    while ((matches = regex.exec(text)) && words.length < 500) {
 	words.push({
 	    value: matches[0],
 	    index: matches.index,
 	});
     }
-    filtered = filterConstNaNs( filterConstStr( filterComments(words) ) );
+    return filterConstNaNs( filterConstStr( filterComments(words) ) );
+};
 
-    const checkOrder = ( arr ) => {
-	// Simple syntax check for proper ordering of source words in an incrementally growing dictionary
-	let res=[], current_dictionary=dictionary;
-	for( i in arr ){
-	    if( !current_dictionary.includes( arr[i].value ) ){
-		if( ':' != arr[i-1].value )
-		    res.push( arr[i] );
-		else
-		    current_dictionary.push( arr[i].value );
-	    }
+const getDefiningWords = (text) => {
+    let defwords = [
+	{ word: 'variable',	scope: 1 },
+	{ word: 'constant',	scope: 1 }
+    ];
+    let filtered = getOrderedWords( text );
+    let i = 1, state=0, rec=null, j=-1;
+    while( i<filtered.length ){
+
+	// console.log( "> " + i + "\t" +
+	// 	     filtered[i-1].value + ", " + filtered[i].value + ", "
+	// 	     + state );
+
+	if( ':' == filtered[i-1].value ){
+	    state = 1;
+	    rec = { word: filtered[i].value, scope: 0 };
 	}
-	return res;
-    };
+	j = defwords.map( elt => elt.word ).indexOf( filtered[i-1].value );
+	// console.log( i + '\t' + j + '\t' + filtered[i].value ); if( j>0 ) console.log(defwords[j]);
+	if( 0 <= j && 0 < defwords[j].scope ){
+	    defwords.push({ word: filtered[i].value, scope: defwords[j].scope - 1 });
+	    i += 1;
+	}
+	if( 'create' == filtered[i].value ){
+	    if( 1 == state ) rec.scope += 1;
+	}
+	if( ';' == filtered[i].value ){
+	    state = 0;
+	    if( rec.scope > 0 ) defwords.push( rec );
+	}
+	i+=1;
+    }
+    return defwords;
+};
 
-    // return filtered.filter( x => !dictionary.includes( x.value ) );
-    return checkOrder( filtered );
+const getUndefinedWords = (text) => {
+    let defwords = getDefiningWords( text );
+    let filtered = getOrderedWords( text );
+    return checkOrder( filtered, defwords );
 };
 
 // // Make sure we got a filename on the command line.
@@ -116,13 +154,18 @@ const getUndefinedWords = (text) => {
 // fs.readFile(filename, 'utf8', function(err, data) {
 //     if (err) throw err;
 //     console.log('OK: ' + filename + ', ' + fragment);
-//     var res = getUndefinedWords(data);
+
+//     var res = getOrderedWords(data);
+//     // console.log( res.length, res );
+
+//     res = getDefiningWords(data);
 //     console.log( res.length, res );
-//     if( undefined != fragment ){
-// 	var impl = gotoImplementation(data, fragment);
-// 	console.log( impl.length, impl );
-//     }
+//     // if( undefined != fragment ){
+//     // 	var impl = gotoImplementation(data, fragment);
+//     // 	console.log( impl.length, impl );
+//     // }
 // });
 
-exports.getUndefinedWords = getUndefinedWords;
-exports.gotoImplementation = gotoImplementation;
+exports.getUndefinedWords	= getUndefinedWords;
+exports.gotoImplementation	= gotoImplementation;
+exports.getDefiningWords	= getDefiningWords;

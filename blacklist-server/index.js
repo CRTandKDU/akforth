@@ -35,7 +35,7 @@ const blacklistToDiagnostic = (textDocument) => ({ index, value }) => ({
     start: textDocument.positionAt(index),
     end: textDocument.positionAt(index + value.length),
   },
-  message: `${value} is not in dictionary.`,
+  message: `${value} is not in dictionary at this point.`,
   source: 'FORTH Checker',
 });
 
@@ -64,6 +64,7 @@ connection.onImplementation( params => {
     const symbolAtPoint = ( data ) => {
 	let txt = document.getText(), impl;
 	let i   = 0, found=false, p;
+	// Search point position in text array
 	while( i<txt.length && !found ){
 	    p = document.positionAt(i);
 	    if( data.position.line == p.line && data.position.character == p.character ){
@@ -72,40 +73,58 @@ connection.onImplementation( params => {
 	    else i = i+1;
 	}
 	if( found ){
-	    let j = i;
+	    // Search forward
+	    let j = i, k = i;
 	    while( j<txt.length && txt[j] != ' ' && txt[j] != '\n' && txt[j] != '\r' ) j += 1;
-	    impl = { fragment: txt.slice( i, j ), start:i, end:j };
+	    while( k>=0 && txt[k] != ' ' && txt[k] != '\n' && txt[k] != '\r' ) k -= 1;
+	    impl = { fragment: txt.slice( k+1, j ), start:k+1, end:j };
 	}
 	else
 	    impl = { fragment: null, start:-1, end:-1 };
 	
 	return impl;
     };
+
+    const toLocation = ({ index, value, prefix }) => ({
+	    uri: params.textDocument.uri,
+	    range: (index >= 0) ? {
+		start	: document.positionAt(index),
+		end	: document.positionAt(index + value.length)
+	    } : {
+		start	: document.positionAt(impl.start),
+		end	: document.positionAt(impl.end)
+	    }
+    });
     
     let document	= documents.get(params.textDocument.uri);
     let impl		= symbolAtPoint(params);
     if( impl.fragment ){
-	let result	= FORTHChecker.gotoImplementation( document.getText(), impl.fragment )[0];
-	if( result.index >= 0 ){
-	    // Definition/Implementation found
-	    return({
-		uri: params.textDocument.uri,
-		range: {
-		    start	: document.positionAt(result.index),
-		    end		: document.positionAt(result.index + result.value.length)
-		}
-	    });
-	}
-	else{
-	    // Could be a FORTH primitive
-	    return ({
-		uri: params.textDocument.uri,
-		range: {
-		    start	: document.positionAt(impl.start),
-		    end		: document.positionAt(impl.end)
-		}
-	    });
-	}
+	let results	= FORTHChecker.gotoImplementation( document.getText(), impl.fragment );
+	// for( let i in results ){ console.error( results[i].index + ', ' + results[i].value + ', ' + results[i].prefix ); }
+	let res         = results.map( toLocation );
+	// for( let i in res ){ console.error( res[i].range  ); }
+	return res;
+	
+	// if( result.index >= 0 ){
+	//     // Definition/Implementation found
+	//     return({
+	// 	uri: params.textDocument.uri,
+	// 	range: {
+	// 	    start	: document.positionAt(result.index),
+	// 	    end		: document.positionAt(result.index + result.value.length)
+	// 	}
+	//     });
+	// }
+	// else{
+	//     // Could be a FORTH primitive
+	//     return ({
+	// 	uri: params.textDocument.uri,
+	// 	range: {
+	// 	    start	: document.positionAt(impl.start),
+	// 	    end		: document.positionAt(impl.end)
+	// 	}
+	//     });
+	// }
 
     }
     else return( undefined );
