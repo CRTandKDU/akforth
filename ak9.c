@@ -429,8 +429,9 @@ static void f_drop(void) {sp_pop();} // drop top of stack
 
 static void f_words(void) { // display all defined words
   xt_t *w;
-  for(w=dictionary;w;w=w->next) if(!w->hidden) printf("%s ", w->name);
-  printf("\n");
+  /* for(w=dictionary;w;w=w->next) if(!w->hidden) printf("%s ", w->name); printf("\n");*/
+  printf("["); for(w=dictionary;w;w=w->next) printf("\"%s\", ", w->name);
+  printf("\b\b]\n");
 }
 
 static void f_dot(void) {
@@ -610,6 +611,8 @@ static void f_dup(void){cell_t t=*sp; sp_push(t);}
 static void f_swap(void) { cell_t t=*sp; *sp=sp[-1]; sp[-1]=t; }
 
 static void f_over(void){ sp_push( sp[-1] ); }
+static void f_nover(void){ int i = (int)sp_pop(); sp_push( sp[0-i] ); }
+static void f_noverdrop(void){ int j, i = (int)sp_pop(); for( j=0; j<i; j++ ) sp[-i-i+1+j] = sp[-i+1+j]; sp -= i; }
 
 static void f_rot(void){
   cell_t a = sp_pop();
@@ -933,6 +936,8 @@ static void register_primitives(void) {
   xt_swap=add_word("swap",	f_swap);
   add_word("rot",		f_rot);
   add_word("over",		f_over);
+  add_word("nover",		f_nover);
+  add_word("noverdrop",		f_noverdrop);
   add_word("words",		f_words);	// list all defined words
   add_word("type",		f_type);	// course02, output string
   add_word("string=",           f_stringeq);    //

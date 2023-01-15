@@ -7,6 +7,7 @@
 ( <N> -- <integer_sqrt_N> )
 ( Linear search using addition )
 : isqrt 0 >R 3 >R 1 >R begin R> R> R> 1 + >R dup 2 + >R + dup >R swap dup rot >= while drop R> drop R> drop R> ;
-( Binary Search )
-\ : isqrtbin dup 1 + 0 >R >R begin  dup R> R> dup >R swap dup >R  + 2 / dup dup * rot  <= if R> R> rot >R swap >R  else R> R> dup  >R swap drop  swap >R  then drop R> R> dup >R swap dup >R 1 - - 0<>  while drop R> R> drop ;
+( Binary Search -- problematic for large numbers )
 : isqrt2 dup 1 + 0 begin over over + 2 / dup >R dup * >R rot dup R> > if rot rot drop R> else rot drop R> rot then over over 1 + - 0<> while ;
+( Newton Method -- there are subtelties with integer division )
+: isqrtn dup 2 / over over / over + 2 / begin rot over over over / + 2 / >R rot drop swap R> over over > while drop swap drop ;
