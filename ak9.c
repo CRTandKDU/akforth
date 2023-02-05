@@ -14,12 +14,14 @@
 // M-x imenu-list-minor-mode
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define GET_LO_CHAR(a)      *((unsigned char *)&a)
 #define GET_HI_CHAR(a)      *(((unsigned char *)&a) + 1)
 
 static short RUNNING	= 1;
-static short errno	= 0;
+/* static short errno	= 0; */
 static short BASE       = 10;
 
 // Some functions are reimplemented (simplistically) to break some dependencies
@@ -71,8 +73,8 @@ int  isspace(int c){
 /* String functions */
 /* Source: $OpenBSD: strtol.c,v 1.7 2005/08/08 08:05:37 espie Exp $ */
 #define ERANGE          34      /* Math result not representable */
-#define LONG_MIN        -2147483647
-#define LONG_MAX        2147483647
+/* #define LONG_MIN        -2147483647 */
+/* #define LONG_MAX        2147483647 */
 
 long STRTOL(const char *nptr, char **endptr, int base){
   const char *s;
@@ -462,6 +464,26 @@ static void f_stringeq(void){
   sp_push( STRCMP( s1, s2 ) ? (cell_t) 0 : (cell_t) 1 );
 }
 
+static void f_stringcat(void){
+  char *s1 = (char *)sp_pop();
+  char *s2 = (char *)sp_pop();
+  char res[255];
+  sprintf( res, "%s%s", s1, s2 );
+  sp_push( (cell_t)STRDUP(res) );
+}
+
+static void f_atoi(void){
+  char *s1 = (char *)sp_pop();
+  sp_push( (cell_t)atoi( s1 ) );
+}
+
+static void f_itoa(void){
+  int x = (int)sp_pop();
+  char res[255];
+  sprintf( res, "%d", x );
+  sp_push( (cell_t)STRDUP(res) );
+}
+
 static void f_accept(void){
   // Due to I/O implementation `accept' has to be the last word on a line
   static char *acceptbuf[ 32 ];
@@ -720,10 +742,10 @@ static void f_dis(void) {
   for(; (*ip)->prim!=f_leave;ip++) {
     xt_t *xt=*ip;
     if(xt->has_lit) {
-      printf("%X %s %X\n", ip, xt->name, ip[1]);
+      printf("(%d) %X %s %X\n", ip, ip, xt->name, ip[1]);
       ip++;
     } else {
-      printf("%X %s\n", ip, xt->name);
+      printf("(%d) %X %s\n", ip, ip, xt->name);
     }
     if( xt_continue == xt ) break;
   }
@@ -820,6 +842,23 @@ static void f_set_stdin(void){
 
 static void f_get_stdin(void){
   sp_push( (cell_t)S_stdin );
+}
+
+static void f_system_call(void){
+  char command[255];
+  char *cmd	= (char *)sp_pop();
+  char *tmp	= "out.txt";
+  int ignore	;
+  sprintf( command, "%s > %s", cmd, tmp );
+  ignore = system( command );
+
+  FILE *fp	= fopen ( "out.txt" , "rb" );
+  char str[32];
+  fread (str, sizeof(char), 32, fp);
+  fclose( fp );
+
+  sp_push( (cell_t) atoi( str ) );
+
 }
 
 // EXTENSIONS
@@ -941,6 +980,9 @@ static void register_primitives(void) {
   add_word("words",		f_words);	// list all defined words
   add_word("type",		f_type);	// course02, output string
   add_word("string=",           f_stringeq);    //
+  add_word("stringcat",         f_stringcat);    //
+  add_word("string2i",          f_atoi);    //
+  add_word("i2string",          f_itoa);    //
   add_word("accept",            f_accept );
   add_word(".",			f_dot);		// course02, output number
   add_word("cr",		f_cr);		// course02, output CR
@@ -966,6 +1008,7 @@ static void register_primitives(void) {
   add_word("xt>name",		f_xt_to_name); latest->hidden=1;
   xt_sstdin =add_word("stdin!", f_set_stdin);
   xt_gstdin =add_word("stdin@", f_get_stdin);
+  add_word("system",            f_system_call);
 
   xt_bye =		add_word("bye",			f_bye);
   xt_leave =		add_word("leave",		f_leave);
