@@ -562,9 +562,13 @@ static void f_colon() { // course03, define a new word
   is_compile_mode=1; // switch to compile mode
 }
 
+/* f_create
+ * The CREATE word consumes the next string in the input and creates a header for a new word.
+ * It pushed the address of the new word on the stack (`latest' is updated by `add_word')
+ */
 static void f_create(){
   char *w=word(); // read next word which becomes the word name
-  add_word(STRDUP(w), f_docol);
+  sp_push( (cell_t) add_word(STRDUP(w), f_docol) );
 }
 
 /* ‘does>’: lots of literature and discussion on its workings. */
